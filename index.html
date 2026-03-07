@@ -1,70 +1,521 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hand Particle Magic</title>
+    <title>Columbina AI - Chat Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gray: {
+                            50: '#f9fafb',
+                            100: '#f3f4f6',
+                            200: '#e5e7eb',
+                            300: '#d1d5db',
+                            400: '#9ca3af',
+                            500: '#6b7280',
+                            600: '#4b5563',
+                            700: '#374151',
+                            800: '#1f2937',
+                            900: '#111827',
+                            950: '#030712',
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out',
+                        'slide-up': 'slideUp 0.3s ease-out',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'glow': 'glow 2s ease-in-out infinite alternate',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(10px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        glow: {
+                            '0%': { boxShadow: '0 0 5px rgba(255,255,255,0.2)' },
+                            '100%': { boxShadow: '0 0 20px rgba(255,255,255,0.4)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
         body {
-            margin: 0;
-            overflow: hidden;
-            background: #0a0a0a;
+            font-family: 'Inter', sans-serif;
+            background-color: #000000;
+            color: #ffffff;
         }
-        #canvas {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+        
+        #chat-container {
+    padding-bottom: 50px; /* Sesuaikan dengan tinggi input + margin */
+}
+        
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
         }
-        #video {
-            position: absolute;
-            opacity: 0;
-            pointer-events: none;
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
         }
-        .glow-text {
-            text-shadow: 0 0 20px rgba(0, 255, 128, 0.5), 0 0 40px rgba(0, 255, 128, 0.3);
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .typing-dot {
+            animation: typing 1.4s infinite ease-in-out both;
+        }
+        
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+        
+        .message-bubble {
+            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .ai-avatar-glow {
+            box-shadow: 0 0 30px rgba(255,255,255,0.2);
         }
     </style>
 </head>
-<body class="bg-black text-white">
-    <!-- Hidden video for hand tracking -->
-    <video id="video" class="hidden"></video>
-    
-    <!-- Main canvas for particles -->
-    <canvas id="canvas"></canvas>
-    
-    <!-- UI Overlay -->
-    <div class="fixed top-0 left-0 w-full h-full pointer-events-none flex flex-col items-center justify-center z-10">
-        <div id="startScreen" class="text-center pointer-events-auto">
-            <h1 class="text-5xl md:text-7xl font-bold mb-4 glow-text bg-gradient-to-r from-green-400 via-emerald-500 to-teal-400 bg-clip-text text-transparent">
-                Hand Particle Magic
-            </h1>
-            <p class="text-gray-400 text-lg mb-8 max-w-md mx-auto px-4">
-                Gerakkan tangan Anda untuk mengendalikan partikel. <br>
-                <span class="text-sm text-gray-500">Izinkan akses kamera untuk memulai</span>
-            </p>
-            <button id="startBtn" class="px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full font-semibold text-lg hover:scale-105 transition-transform shadow-lg shadow-green-500/30">
-                Mulai Pengalaman
+<body class="h-screen overflow-hidden bg-black text-white antialiased">
+
+    <!-- Sidebar -->
+    <div id="sidebar" class="fixed left-0 top-0 h-full w-64 bg-gray-950 border-r border-gray-800 transform -translate-x-full md:translate-x-0 transition-transform duration-300 z-50">
+        <div class="p-4 border-b border-gray-800">
+            <button onclick="newChat()" class="w-full flex items-center gap-3 px-4 py-3 bg-white text-black rounded-lg hover:bg-gray-200 transition-all duration-200 font-medium text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                New Chat
             </button>
         </div>
         
-        <div id="loadingScreen" class="hidden text-center">
-            <div class="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p class="text-green-400">Memuat hand tracking...</p>
-        </div>
-        
-        <div id="statusIndicator" class="hidden fixed top-6 right-6 flex items-center gap-2 bg-black/50 backdrop-blur-sm px-4 py-2 rounded-full border border-green-500/30">
-            <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-            <span class="text-sm text-green-400">Hand Tracking Aktif</span>
+        <div class="p-4 overflow-y-auto h-[calc(100%-80px)]">
+            <div class="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wider">Recent Chats</div>
+            <div id="chat-history" class="space-y-2">
+                <!-- Chat history items will appear here -->
+            </div>
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <!-- Main Content -->
+    <div class="md:ml-64 h-full flex flex-col relative">
+        
+        <!-- Header -->
+        <header class="flex items-center justify-between px-6 py-4 border-b border-gray-800 bg-black/50 backdrop-blur-md z-40">
+            <div class="flex items-center gap-3">
+                <button onclick="toggleSidebar()" class="md:hidden p-2 hover:bg-gray-800 rounded-lg transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                </button>
+                
+                <!-- AI Profile Section -->
+                <div class="flex items-center gap-3 group cursor-pointer">
+                    <div class="relative">
+                        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS9wrwz0pmm3BPt17DOq9HGcqGAk-Mx9FlQzKtzAADCPYJo9ThwbR8ATizT&s=10" 
+                             alt="Columbina" 
+                             class="w-10 h-10 rounded-full object-cover ai-avatar-glow border-2 border-gray-700 group-hover:border-white transition-all duration-300">
+                        <div class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-black"></div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-semibold text-lg tracking-tight">Columbina</h1>
+                        <img src="https://scontent.fpkr3-1.fna.fbcdn.net/v/t39.8562-6/586216991_4084064581857862_3245214017452253781_n.svg?_nc_cat=101&ccb=1-7&_nc_sid=f537c7&_nc_ohc=C5KpoaAS53gQ7kNvwGAJy2t&_nc_oc=AdlNBup-T3eL8DOO5a00OwDcdvxYp_D1wdb_0z-wm5d6LKNBy9DsD7JWZG50pvp8bkI&_nc_zt=14&_nc_ht=scontent.fpkr3-1.fna&_nc_gid=xQFSk0BDUmse9mCuN53f-A&_nc_ss=8&oh=00_AfzqD4CXN8pPFfwZt_dKBY0CrOPkbf4AVKReI7IP9AHLXg&oe=69B18873" 
+                             alt="Verified" 
+                             class="w-3 h-3"
+                             title="Verified Account">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <button onclick="clearChat()" class="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-all" title="Clear Chat">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Anime Character Figure (Top Left of Chatbox) -->
+        <div class="absolute top-20 left-4 z-30 animate-float pointer-events-none hidden md:block">
+            <div class="relative">
+                <div class="absolute -inset-1 bg-gradient-to-r from-white/20 to-transparent blur-lg rounded-full"></div>
+                <img src="https://64.media.tumblr.com/0e21a8034684749cac923f5e70d472ba/aaaa93f92078e9ba-1b/s1280x1920/8938ccbcd7dc5b6e3986b95dfe202731da8cc157.png" 
+                     alt="Anime Assistant" 
+                     class="relative w-32 h-auto drop-shadow-2xl filter brightness-90 hover:brightness-100 transition-all duration-500">
+            </div>
+        </div>
+
+        <!-- Chat Container -->
+        <div id="chat-container" class="flex-1 overflow-y-auto scrollbar-hide p-4 md:p-8 space-y-6">
+            
+            <!-- Welcome Message -->
+            <div id="welcome-message" class="flex flex-col items-center justify-center h-full text-center space-y-4 animate-fade-in">
+                <div class="relative">
+                    <div class="absolute -inset-4 bg-white/10 blur-xl rounded-full animate-pulse-slow"></div>
+                    <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS9wrwz0pmm3BPt17DOq9HGcqGAk-Mx9FlQzKtzAADCPYJo9ThwbR8ATizT&s=10" 
+                         alt="Columbina" 
+                         class="relative w-20 h-20 rounded-full border-2 border-gray-700 object-cover">
+                </div>
+                <h2 class="text-3xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">Columbina AI</h2>
+                <p class="text-gray-400 max-w-md">Asisten AI gratis tanpa batasan. Tanyakan apa saja, saya siap membantu 24/7.</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-8 w-full max-w-2xl px-4">
+                    <button onclick="setPrompt('Jelaskan tentang dunia anime modern')" class="p-4 glass-effect rounded-xl text-left hover:bg-white/10 transition-all group">
+                        <div class="text-2xl mb-2">🎨</div>
+                        <div class="text-sm font-medium">Jelaskan tentang</div>
+                        <div class="text-xs text-gray-400 group-hover:text-gray-300">Dunia anime modern</div>
+                    </button>
+                    <button onclick="setPrompt('Bantu saya menulis kode JavaScript')" class="p-4 glass-effect rounded-xl text-left hover:bg-white/10 transition-all group">
+                        <div class="text-2xl mb-2">💻</div>
+                        <div class="text-sm font-medium">Bantu coding</div>
+                        <div class="text-xs text-gray-400 group-hover:text-gray-300">JavaScript & Web Dev</div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Messages will appear here -->
+        </div>
+
+<!-- Input Area (Fixed Bottom) -->
+<div class="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black to-transparent pt-6 pb-4 px-4 md:px-6 z-40">
+    <div class="max-w-3xl mx-auto relative">
+        <!-- Input Container -->
+        <div class="relative glass-effect rounded-2xl p-2 animate-glow">
+            <textarea 
+                id="user-input" 
+                rows="1"
+                class="w-full bg-transparent text-white placeholder-gray-500 resize-none outline-none px-4 py-3 max-h-32 scrollbar-hide"
+                placeholder="Tanyakan apa saja kepada Columbina..."
+                onkeydown="handleKeyDown(event)"
+                oninput="autoResize(this)"></textarea>
+            
+            <div class="flex items-center justify-between px-2 pb-2">
+                <div class="flex items-center gap-2">
+                    <button class="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-all" title="Attach file">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                    </button>
+                </div>
+                
+                <button 
+                    onclick="sendMessage()" 
+                    id="send-btn"
+                    class="p-2 bg-white text-black rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 active:scale-95">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                </button>
+            </div>
+        </div>
+        
+        <div class="text-center mt-2 text-xs text-gray-600">
+            Columbina adalah AI dan juga dapat melakukan kesalahan • <span class="text-gray-500">Respons mungkin memerlukan waktu</span>
+        </div>
+    </div>
+</div>
+
+    <!-- Typing Indicator Template -->
+    <template id="typing-template">
+        <div class="flex items-start gap-3 animate-fade-in">
+            <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS9wrwz0pmm3BPt17DOq9HGcqGAk-Mx9FlQzKtzAADCPYJo9ThwbR8ATizT&s=10" 
+                 class="w-8 h-8 rounded-full border border-gray-700 mt-1">
+            <div class="message-bubble rounded-2xl px-4 py-3 max-w-[80%] md:max-w-[70%]">
+                <div class="flex gap-1">
+                    <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+                    <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+                    <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        let chatHistory = [];
+        let currentChatId = Date.now();
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadChatHistory();
+            document.getElementById('user-input').focus();
+        });
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 128) + 'px';
+        }
+
+        function handleKeyDown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function setPrompt(text) {
+            const input = document.getElementById('user-input');
+            input.value = text;
+            input.focus();
+            autoResize(input);
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('-translate-x-full');
+        }
+
+        function newChat() {
+            currentChatId = Date.now();
+            document.getElementById('chat-container').innerHTML = `
+                <div id="welcome-message" class="flex flex-col items-center justify-center h-full text-center space-y-4 animate-fade-in">
+                    <div class="relative">
+                        <div class="absolute -inset-4 bg-white/10 blur-xl rounded-full animate-pulse-slow"></div>
+                        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS9wrwz0pmm3BPt17DOq9HGcqGAk-Mx9FlQzKtzAADCPYJo9ThwbR8ATizT&s=10" 
+                             alt="Columbina" 
+                             class="relative w-20 h-20 rounded-full border-2 border-gray-700 object-cover">
+                    </div>
+                    <h2 class="text-3xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">Columbina AI</h2>
+                    <p class="text-gray-400 max-w-md">Asisten AI gratis tanpa batasan. Tanyakan apa saja, saya siap membantu 24/7.</p>
+                </div>
+            `;
+            document.getElementById('user-input').value = '';
+            document.getElementById('user-input').style.height = 'auto';
+            if (window.innerWidth < 768) {
+                toggleSidebar();
+            }
+        }
+
+        function clearChat() {
+            if (confirm('Yakin ingin menghapus percakapan ini?')) {
+                newChat();
+            }
+        }
+
+        function loadChatHistory() {
+            // Simulated chat history
+            const history = [
+                { id: 1, title: 'Percakapan tentang Anime', date: 'Hari ini' },
+                { id: 2, title: 'Bantu Coding JavaScript', date: 'Kemarin' }
+            ];
+            
+            const container = document.getElementById('chat-history');
+            container.innerHTML = history.map(chat => `
+                <div class="group flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 cursor-pointer transition-all border border-transparent hover:border-gray-700" onclick="loadChat(${chat.id})">
+                    <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-gray-300 truncate">${chat.title}</div>
+                        <div class="text-xs text-gray-600">${chat.date}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function loadChat(id) {
+            // Simulate loading chat
+            newChat();
+            if (window.innerWidth < 768) {
+                toggleSidebar();
+            }
+        }
+
+// ======================== KONFIGURASI API GRATIS ========================
+const AI_API = {
+    // Endpoint baru (recommended)
+    newEndpoint: 'https://enter.pollinations.ai/generate',
+    // Endpoint lama (fallback)
+    legacyEndpoint: 'https://text.pollinations.ai/',
+    defaultModel: 'openai', // Bisa diganti: 'llama', 'mistral', dll
+    timeout: 15000
+};
+
+// ======================== FUNGSI UTAMA SEND MESSAGE ========================
+async function sendMessage() {
+    const input = document.getElementById('user-input');
+    const message = input.value.trim();
+
+    if (!message) return;
+
+    // Sembunyikan welcome message jika ada
+    const welcome = document.getElementById('welcome-message');
+    if (welcome) welcome.remove();
+
+    // Tampilkan pesan user
+    addMessage(message, 'user');
+    input.value = '';
+    input.style.height = 'auto';
+
+    // Tampilkan typing indicator
+    const typingId = showTypingIndicator();
+
+    try {
+        // Coba endpoint baru (POST) terlebih dahulu
+        let aiText = await fetchNewAPI(message);
+        removeTypingIndicator(typingId);
+        addMessage(aiText, 'ai');
+    } catch (newError) {
+        console.warn('New API failed, trying legacy GET...', newError);
+        try {
+            // Fallback ke endpoint lama
+            let aiText = await fetchLegacyAPI(message);
+            removeTypingIndicator(typingId);
+            addMessage(aiText, 'ai');
+        } catch (legacyError) {
+            removeTypingIndicator(typingId);
+            let errorMessage = '⚠️ Maaf, layanan AI sedang sibuk. ';
+            if (legacyError.name === 'AbortError') {
+                errorMessage += 'Waktu habis.';
+            } else {
+                errorMessage += 'Silakan coba lagi.';
+            }
+            addMessage(errorMessage, 'ai', true);
+            console.error('All APIs failed:', legacyError);
+        }
+    }
+}
+
+// Fungsi untuk memanggil API baru (POST)
+async function fetchNewAPI(prompt) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), AI_API.timeout);
+
+    try {
+        const response = await fetch(AI_API.newEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                messages: [{ role: 'user', content: prompt }],
+                model: AI_API.defaultModel,
+                temperature: 0.7,
+                max_tokens: 1000,
+                seed: Date.now()
+            }),
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const data = await response.json();
+        // Sesuaikan dengan struktur response dari enter.pollinations.ai
+        return data.choices?.[0]?.message?.content || data.content || data.text || JSON.stringify(data);
+    } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+    }
+}
+
+// Fungsi untuk memanggil API lama (GET) dengan pembersihan notifikasi
+async function fetchLegacyAPI(prompt) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), AI_API.timeout);
+
+    try {
+        const url = `${AI_API.legacyEndpoint}${encodeURIComponent(prompt)}?model=${AI_API.defaultModel}&seed=${Date.now()}`;
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Accept': 'text/plain' },
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        let text = await response.text();
+        
+        // Hapus notifikasi deprecation jika ada
+        if (text.includes('The Pollinations legacy text API')) {
+            // Ambil bagian setelah notifikasi (biasanya dipisah newline)
+            const lines = text.split('\n');
+            const answerLines = lines.filter(line => 
+                !line.includes('The Pollinations legacy text API') && 
+                !line.includes('Please migrate') && 
+                line.trim() !== ''
+            );
+            if (answerLines.length > 0) {
+                text = answerLines.join('\n');
+            }
+        }
+        
+        return text;
+    } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+    }
+}
+
+        function addMessage(text, sender, isError = false) {
+            const container = document.getElementById('chat-container');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex items-start gap-3 animate-slide-up ${sender === 'user' ? 'flex-row-reverse' : ''}`;
+            
+            const avatar = sender === 'ai' 
+                ? `<img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS9wrwz0pmm3BPt17DOq9HGcqGAk-Mx9FlQzKtzAADCPYJo9ThwbR8ATizT&s=10" class="w-8 h-8 rounded-full border border-gray-700 mt-1">`
+                : `<div class="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center font-bold text-sm">You</div>`;
+            
+            const bubbleClass = sender === 'user' 
+                ? 'bg-white text-black' 
+                : (isError ? 'bg-red-900/30 border-red-800 text-red-200' : 'message-bubble text-white');
+            
+            messageDiv.innerHTML = `
+                ${avatar}
+                <div class="${bubbleClass} rounded-2xl px-4 py-3 max-w-[80%] md:max-w-[70%] shadow-lg">
+                    <div class="text-sm leading-relaxed whitespace-pre-wrap">${formatMessage(text)}</div>
+                </div>
+            `;
+            
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function formatMessage(text) {
+            // Basic markdown-like formatting
+            return text
+                .replace(/```([\s\S]*?)```/g, '<pre class="bg-black/30 p-2 rounded mt-2 mb-2 overflow-x-auto text-xs"><code>$1</code></pre>')
+                .replace(/`([^`]+)`/g, '<code class="bg-white/10 px-1 rounded text-xs">$1</code>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/\n/g, '<br>');
+        }
+
+        function showTypingIndicator() {
+            const container = document.getElementById('chat-container');
+            const template = document.getElementById('typing-template');
+            const clone = template.content.cloneNode(true);
+            const id = 'typing-' + Date.now();
+            clone.firstElementChild.id = id;
+            container.appendChild(clone);
+            container.scrollTop = container.scrollHeight;
+            return id;
+        }
+
+        function removeTypingIndicator(id) {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        }
+
+        // Auto-focus input on load
+        window.onload = () => {
+            document.getElementById('user-input').focus();
+        };
+    </script>
 </body>
 </html>
